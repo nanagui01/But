@@ -20,24 +20,56 @@ module.exports = {
     ],
 
     run: async (client, interaction) => {
-        if (interaction.user.id !== dbp.get(`${interaction.user.id}`)) {
-            return interaction.reply({ ephemeral: true, content: `${dbe.get(`13`)} | Você não tem permissão para usar este comando!` });
-        }
-
-        const canal = interaction.options.getChannel('canal');
+        // Defer para garantir tempo de resposta e interação ephemeral
+        await interaction.deferReply({ ephemeral: true }).catch(err => {
+            console.error(`[CONECTAR] Erro ao deferir:`, err);
+            return;
+        });
 
         try {
+            // Verificação de permissão corrigida (apenas usuários cadastrados no banco)
+            if (!dbp.has(interaction.user.id)) {
+                const emojiErro = dbe.get(`13`) || '❌';
+                return await interaction.editReply({
+                    content: `${emojiErro} | Você não tem permissão para usar este comando!`
+                });
+            }
+
+            const canal = interaction.options.getChannel('canal');
+            if (!canal) {
+                return await interaction.editReply({
+                    content: `❌ | Canal de voz não encontrado.`
+                });
+            }
+
+            // Conecta ao canal de voz
             joinVoiceChannel({
                 channelId: canal.id,
                 guildId: interaction.guild.id,
                 adapterCreator: interaction.guild.voiceAdapterCreator
             });
 
-            interaction.reply({ content: `\`🟢\` Conectado ao canal de voz **${canal.name}** com exito!`, ephemeral: true });
+            await interaction.editReply({
+                content: `\`🟢\` Conectado ao canal de voz **${canal.name}** com sucesso!`
+            });
+
         } catch (error) {
-            console.error("Erro ao conectar:", error);
-            interaction.reply({ ephemeral: true, content: `❌ | Ocorreu um erro ao tentar conectar ao canal de voz.` });
+            console.error(`[CONECTAR] Erro na execução:`, error);
+            // Mensagem de erro amigável
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({
+                        content: `❌ | Ocorreu um erro ao tentar conectar ao canal de voz. Tente novamente.`
+                    });
+                } else {
+                    await interaction.followUp({
+                        content: `❌ | Erro inesperado.`,
+                        ephemeral: true
+                    });
+                }
+            } catch (replyErr) {
+                console.error(`[CONECTAR] Falha ao enviar mensagem de erro:`, replyErr);
+            }
         }
     }
 };
-
