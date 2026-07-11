@@ -1,0 +1,91 @@
+{
+    "pagamentos": {
+        "acess_token": "",
+        "tempo": 10,
+        "sistema": "ON",
+        "blockbank": [
+            "inter",
+            "picpay"
+        ],
+        "semiauto": {
+            "chave": "",
+            "tipo": "",
+            "qrcode": ""
+        },
+        "sistema_semiauto": "OFF",
+        "sistema_auto": "ON",
+        "acess_token_tipo": "maior",
+        "sistema_efi": "OFF",
+        "certificado": "",
+        "secret_id": "",
+        "chavepix": "936ec5ed-819e-4d4a-aa03-3a8bb53a962c",
+        "secret_token": "",
+        "efiblocks": []
+    },
+    "sugest": {
+        "certo": "✅",
+        "errado": "❌",
+        "sistema": "OFF",
+        "channel": ""
+    },
+    "color": "#2a2d31",
+    "autolock": {
+        "hr1": "21:0",
+        "hr2": "07:00",
+        "sistema": "OFF",
+        "canais": []
+    },
+    "autorepost": {
+        "hr": "01:43",
+        "sistema": "OFF"
+    },
+    "automsg": {
+        "sistema": "ON",
+        "canais": []
+    },
+    "canais": {
+        "feedback": "",
+        "vendas_public": "1306466945284964373",
+        "vendas_privado": "1306466945284964373",
+        "cargo_cliente": "1329611385315000374",
+        "cargo_staff": "1305048439876223049",
+        "sistema_carrinho": "ON"
+    },
+    "nmr1": 0,
+    "nmr2": 15,
+    "autorole": {
+        "sistema": "OFF",
+        "cargos": []
+    },
+    "hierarquia": {
+        "tirarcargo": "ON",
+        "sistema": "OFF",
+        "cargos": []
+    },
+    "boasvindas": {
+        "sistema": "ON",
+        "msg": "",
+        "canal": ""
+    },
+    "auth": {
+        "secret": "",
+        "clientid": "",
+        "redirect": "",
+        "url": "",
+        "role": "",
+        "webhooks": {},
+        "req": "ON"
+    },
+    "logs": {
+        "entrada": {
+            "entrou": "",
+            "saiu": ""
+        }
+    },
+    "esales": {
+        "secret_id": "Client_Id_2de8f64c93f49d3a78063e5bb847ecbd734e52d4",
+        "secret_token": "Client_Secret_183eb3ed01c6a0e4ffa7a49da32a6cac3dbb508e",
+        "certificado": "zendCert",
+        "chavepix": "936ec5ed-819e-4d4a-aa03-3a8bb53a962c"
+    }
+}
