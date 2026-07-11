@@ -1,10 +1,24 @@
 const Discord = require("discord.js");
 const { JsonDatabase } = require("wio.db");
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ModalBuilder, TextInputBuilder } = require("discord.js");
 
-const dbp = new JsonDatabase({ databasePath: "./json/perms.json" });
-const dbe = new JsonDatabase({ databasePath: "./json/emojis.json" });
-const dono = new JsonDatabase({ databasePath: "./config.json" });
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ModalBuilder,
+    TextInputBuilder
+} = require("discord.js");
+
+const dbp = new JsonDatabase({
+    databasePath: "./json/perms.json"
+});
+
+const dbe = new JsonDatabase({
+    databasePath: "./json/emojis.json"
+});
+
+const dono = new JsonDatabase({
+    databasePath: "./config.json"
+});
 
 module.exports = {
     name: "setdono",
@@ -12,146 +26,258 @@ module.exports = {
     type: Discord.ApplicationCommandType.ChatInput,
 
     run: async (client, interaction) => {
+
+        const emojiSucesso = dbe.get("6") || "✅";
+        const emojiErro = dbe.get("13") || "❌";
+
+
         try {
-            const emojiSucesso = dbe.get(`6`) || '✅';
-            const emojiErro = dbe.get(`13`) || '❌';
 
-            // Verifica se já existe dono configurado
-            if (!dono.get(`setdono`)) {
-                // ===== PRIMEIRA CONFIGURAÇÃO =====
+            // PRIMEIRA CONFIGURAÇÃO
+            if (!dono.get("setdono")) {
+
+
                 const modal = new ModalBuilder()
-                    .setCustomId(`senharecupera`)
-                    .setTitle('SENHA DE RECUPERAÇÃO')
-                    .addComponents(
-                        new ActionRowBuilder().addComponents(
-                            new TextInputBuilder()
-                                .setCustomId('text')
-                                .setLabel("COLOQUE UMA SENHA")
-                                .setMinLength(4)
-                                .setPlaceholder(`Coloque a senha que você possa redefinir o dono!`)
-                                .setStyle(Discord.TextInputStyle.Short)
-                        )
-                    );
+                    .setCustomId("senharecupera")
+                    .setTitle("SENHA DE RECUPERAÇÃO");
 
-                // Mostra o modal (sem defer antes, pois é modal)
+
+                const input = new TextInputBuilder()
+                    .setCustomId("text")
+                    .setLabel("COLOQUE UMA SENHA")
+                    .setPlaceholder("Senha para recuperar o dono")
+                    .setMinLength(4)
+                    .setStyle(Discord.TextInputStyle.Short);
+
+
+                modal.addComponents(
+                    new ActionRowBuilder()
+                        .addComponents(input)
+                );
+
+
                 await interaction.showModal(modal);
 
-                // Aguarda submissão
+
                 const submitted = await interaction.awaitModalSubmit({
-                    time: 600_000,
-                    filter: (modalInt) => modalInt.user.id === interaction.user.id && modalInt.customId === "senharecupera"
+
+                    time: 600000,
+
+                    filter: i =>
+                        i.user.id === interaction.user.id &&
+                        i.customId === "senharecupera"
+
                 }).catch(() => null);
 
+
+
                 if (!submitted) {
-                    // Se o modal expirou ou foi cancelado, responde à interação original
-                    return await interaction.reply({
-                        content: `${emojiErro} | Tempo esgotado ou modal cancelado.`,
-                        ephemeral: true
-                    }).catch(() => {});
+                    return;
                 }
 
-                // Salva as configurações
-                const senha = submitted.fields.getTextInputValue('text');
-                dono.set(`dono`, interaction.user.id);
-                dono.set(`senha`, senha);
-                dono.set(`setdono`, "setado");
-                dbp.set(`${interaction.user.id}`, interaction.user.id);
 
-                // Responde ao modal (a interação original)
-                const replyMsg = await interaction.reply({
-                    content: `${emojiSucesso} | Dono ${interaction.user} setado com sucesso!`,
+
+                const senha = submitted.fields.getTextInputValue("text");
+
+
+
+                dono.set("dono", interaction.user.id);
+                dono.set("senha", senha);
+                dono.set("setdono", "setado");
+
+
+                dbp.set(
+                    interaction.user.id,
+                    interaction.user.id
+                );
+
+
+
+                await submitted.reply({
+
+                    content:
+                    `${emojiSucesso} | Dono ${interaction.user} configurado com sucesso!`,
+
                     ephemeral: true
+
                 });
 
-                // Envia senha por DM e apaga a resposta após 5s
+
+
                 try {
-                    await interaction.user.send(`# Senha\nA senha para recuperar a posse do seu bot é **${senha}**!`);
-                } catch (err) {
-                    console.error(`[SETDONO] Não foi possível enviar DM para ${interaction.user.tag}:`, err);
-                    // Não quebra o fluxo
+
+                    await interaction.user.send(
+                        `# Senha de recuperação\n\nSua senha é:\n\`${senha}\``
+                    );
+
+                } catch(e){
+
+                    console.log(
+                        "[SETDONO] Não consegui enviar DM."
+                    );
+
                 }
 
-                setTimeout(() => {
-                    replyMsg.delete().catch(() => {});
-                }, 5000);
 
-            } else {
-                // ===== RECUPERAÇÃO DE DONO =====
+
+            }
+
+
+
+            // RECUPERAÇÃO
+            else {
+
+
                 const modal = new ModalBuilder()
-                    .setCustomId(`recuperarbot`)
-                    .setTitle('SENHA DE RECUPERAÇÃO')
-                    .addComponents(
-                        new ActionRowBuilder().addComponents(
-                            new TextInputBuilder()
-                                .setCustomId('text')
-                                .setLabel("COLOQUE A SENHA")
-                                .setMinLength(4)
-                                .setPlaceholder(`Coloque a senha que você definiu de recuperação!`)
-                                .setStyle(Discord.TextInputStyle.Short)
-                        )
-                    );
+
+                    .setCustomId("recuperarbot")
+                    .setTitle("SENHA DE RECUPERAÇÃO");
+
+
+
+                const input = new TextInputBuilder()
+
+                    .setCustomId("text")
+                    .setLabel("COLOQUE A SENHA")
+                    .setPlaceholder("Senha definida anteriormente")
+                    .setMinLength(4)
+                    .setStyle(Discord.TextInputStyle.Short);
+
+
+
+                modal.addComponents(
+
+                    new ActionRowBuilder()
+                    .addComponents(input)
+
+                );
+
+
 
                 await interaction.showModal(modal);
 
-                const submitted = await interaction.awaitModalSubmit({
-                    time: 600_000,
-                    filter: (modalInt) => modalInt.user.id === interaction.user.id && modalInt.customId === "recuperarbot"
-                }).catch(() => null);
 
-                if (!submitted) {
-                    return await interaction.reply({
-                        content: `${emojiErro} | Tempo esgotado ou modal cancelado.`,
-                        ephemeral: true
-                    }).catch(() => {});
+
+                const submitted =
+                await interaction.awaitModalSubmit({
+
+                    time:600000,
+
+                    filter:i =>
+                    i.user.id === interaction.user.id &&
+                    i.customId === "recuperarbot"
+
+                }).catch(()=>null);
+
+
+
+                if(!submitted){
+                    return;
                 }
 
-                const senhaDigitada = submitted.fields.getTextInputValue('text');
-                const senhaCorreta = dono.get(`senha`);
 
-                if (senhaDigitada === senhaCorreta) {
-                    // Remove dono antigo e define o novo
-                    dono.delete(`dono`);
-                    dono.delete(`senha`);
-                    dono.delete(`setdono`);
-                    dbp.deleteAll(); // Limpa permissões (apenas IDs de permissão)
-                    dbp.set(`${interaction.user.id}`, interaction.user.id);
 
-                    const replyMsg = await interaction.reply({
-                        content: `${emojiSucesso} | Dono e senha removidos! Adicione uma nova senha agora mesmo.`,
-                        ephemeral: true
+                const senhaDigitada =
+                submitted.fields.getTextInputValue("text");
+
+
+
+                const senhaCorreta =
+                dono.get("senha");
+
+
+
+
+                if(senhaDigitada === senhaCorreta){
+
+
+                    dono.delete("dono");
+                    dono.delete("senha");
+                    dono.delete("setdono");
+
+
+                    dbp.deleteAll();
+
+
+                    dbp.set(
+                        interaction.user.id,
+                        interaction.user.id
+                    );
+
+
+
+                    await submitted.reply({
+
+                        content:
+                        `${emojiSucesso} | Senha correta! O dono anterior foi removido.`,
+
+                        ephemeral:true
+
                     });
 
-                    setTimeout(() => {
-                        replyMsg.delete().catch(() => {});
-                    }, 5000);
+
+
                 } else {
-                    const replyMsg = await interaction.reply({
-                        content: `${emojiErro} | Cai fora intruso! Caso você insista demais em roubar a posse do bot, avisaremos o dono.`,
-                        ephemeral: true
+
+
+                    await submitted.reply({
+
+                        content:
+                        `${emojiErro} | Senha incorreta!`,
+
+                        ephemeral:true
+
                     });
 
-                    setTimeout(() => {
-                        replyMsg.delete().catch(() => {});
-                    }, 5000);
+
                 }
+
             }
-        } catch (error) {
-            console.error(`[SETDONO] Erro na execução:`, error);
-            // Tenta responder se a interação ainda estiver ativa
+
+
+
+        } catch(error){
+
+
+            console.error(
+                "[SETDONO] Erro:",
+                error
+            );
+
+
+
+            // Só tenta responder se ainda puder
+
             try {
-                if (!interaction.replied && !interaction.deferred) {
+
+
+                if(
+                    !interaction.replied &&
+                    !interaction.deferred
+                ){
+
                     await interaction.reply({
-                        content: `❌ | Ocorreu um erro interno ao configurar o dono.`,
-                        ephemeral: true
+
+                        content:
+                        "❌ | Ocorreu um erro interno.",
+
+                        ephemeral:true
+
                     });
-                } else if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({
-                        content: `❌ | Ocorreu um erro interno.`
-                    });
+
                 }
-            } catch (replyErr) {
-                console.error(`[SETDONO] Falha ao enviar mensagem de erro:`, replyErr);
+
+
+            }catch(e){
+
+                console.error(
+                    "[SETDONO] Erro ao responder:",
+                    e
+                );
+
             }
+
         }
+
     }
 };
