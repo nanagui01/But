@@ -1,130 +1,201 @@
 const Discord = require("discord.js");
 const express = require("express");
 
+
 // =========================
-// SERVIDOR PARA O RENDER
+// RENDER WEB SERVER
 // =========================
 
 const app = express();
 
 app.get("/", (req, res) => {
-  res.status(200).send("Bot online!");
+    res.status(200).send("Bot online!");
 });
 
 app.get("/status", (req, res) => {
-  res.json({
-    online: true,
-    bot: "online"
-  });
+    res.json({
+        status: "online",
+        uptime: process.uptime()
+    });
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`🌐 Servidor iniciado na porta ${process.env.PORT || 3000}`);
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`🌐 Web iniciado na porta ${PORT}`);
 });
 
 
 // =========================
-// DISCORD CLIENT
+// CLIENT DISCORD
 // =========================
 
 const client = new Discord.Client({
-  intents: [
-    Discord.GatewayIntentBits.Guilds,
-    Discord.GatewayIntentBits.GuildMessages,
-    Discord.GatewayIntentBits.MessageContent,
-    Discord.GatewayIntentBits.GuildMembers,
-    32767
-  ]
+
+    intents: [
+        Discord.GatewayIntentBits.Guilds,
+        Discord.GatewayIntentBits.GuildMessages,
+        Discord.GatewayIntentBits.MessageContent,
+        Discord.GatewayIntentBits.GuildMembers
+    ]
+
 });
+
 
 module.exports = client;
 
-console.clear();
-
-
-// =========================
-// INTERAÇÕES SLASH
-// =========================
-
-client.on("interactionCreate", async (interaction) => {
-
-  if (interaction.type === Discord.InteractionType.ApplicationCommand) {
-
-    const cmd = client.slashCommands.get(interaction.commandName);
-
-    if (!cmd)
-      return interaction.reply({
-        content: "Comando não encontrado.",
-        ephemeral: true
-      });
-
-    if (interaction.guild) {
-      interaction.member =
-        interaction.guild.members.cache.get(interaction.user.id);
-    }
-
-    try {
-      await cmd.run(client, interaction);
-    } catch (err) {
-      console.log("Erro no comando:", err);
-    }
-  }
-
-
-  if (interaction.isAutocomplete()) {
-
-    const command =
-      client.slashCommands.get(interaction.commandName);
-
-    if (!command || !command.autocomplete)
-      return;
-
-    try {
-      await command.autocomplete(interaction);
-    } catch (err) {
-      console.log("Erro autocomplete:", err);
-    }
-  }
-
-});
-
-
-// =========================
-// PROTEÇÃO CONTRA ERROS
-// =========================
-
-process.on("multipleResolutions", (type, reason, promise) => {
-  console.log("Multiple Resolution:", type, promise, reason);
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.log("Unhandled Rejection:", reason, promise);
-});
-
-process.on("uncaughtException", (error, origin) => {
-  console.log("Uncaught Exception:", error, origin);
-});
-
-process.on("uncaughtExceptionMonitor", (error, origin) => {
-  console.log("Exception Monitor:", error, origin);
-});
-
-
-// =========================
-// SISTEMAS
-// =========================
-
 client.slashCommands = new Discord.Collection();
+
+
+// =========================
+// HANDLERS
+// =========================
 
 const events = require("./handler/events");
 const slash = require("./handler/slash");
+
 
 slash.run(client);
 events.run(client);
 
 
 // =========================
+// INTERAÇÕES
+// =========================
+
+client.on("interactionCreate", async interaction => {
+
+
+    if (interaction.isChatInputCommand()) {
+
+
+        const command =
+            client.slashCommands.get(interaction.commandName);
+
+
+        if (!command)
+            return;
+
+
+        if(interaction.guild){
+
+            interaction.member =
+            await interaction.guild.members.fetch(
+                interaction.user.id
+            );
+
+        }
+
+
+        try {
+
+            await command.run(
+                client,
+                interaction
+            );
+
+
+        } catch(error){
+
+            console.error(
+                "Erro comando:",
+                error
+            );
+
+
+            if(!interaction.replied && !interaction.deferred){
+
+                await interaction.reply({
+                    content:
+                    "❌ Ocorreu um erro ao executar o comando.",
+                    ephemeral:true
+                }).catch(()=>{});
+
+            }
+
+        }
+
+    }
+
+
+
+    if(interaction.isAutocomplete()){
+
+
+        const command =
+        client.slashCommands.get(
+            interaction.commandName
+        );
+
+
+        if(!command?.autocomplete)
+            return;
+
+
+        try{
+
+            await command.autocomplete(
+                interaction
+            );
+
+        }catch(error){
+
+            console.log(
+                "Autocomplete erro:",
+                error
+            );
+
+        }
+
+    }
+
+});
+
+
+
+// =========================
+// ERROS
+// =========================
+
+process.on(
+    "unhandledRejection",
+    error =>
+    console.log(
+        "Unhandled:",
+        error
+    )
+);
+
+
+process.on(
+    "uncaughtException",
+    error =>
+    console.log(
+        "Exception:",
+        error
+    )
+);
+
+
+
+// =========================
 // LOGIN
 // =========================
 
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN)
+.then(()=>{
+
+    console.log(
+        `🤖 Logado como ${client.user.tag}`
+    );
+
+})
+.catch(error=>{
+
+    console.error(
+        "Erro no login:",
+        error
+    );
+
+});
