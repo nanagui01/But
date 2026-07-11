@@ -1,5 +1,6 @@
 const Discord = require("discord.js");
 const { JsonDatabase } = require("wio.db");
+
 const dbe = new JsonDatabase({ databasePath: "./json/emojis.json" });
 const dbp = new JsonDatabase({ databasePath: "./json/perms.json" });
 
@@ -16,51 +17,96 @@ module.exports = {
         }
     ],
     run: async (client, interaction) => {
-        if (!interaction.member.permissions.has(Discord.PermissionFlagsBits.ManageChannels))
-            return interaction.reply({ ephemeral: true, content: `${dbe.get(`13`)} | Você não tem permissão para usar este comando!` });
+        // Defer para evitar timeout e garantir ephemeral
+        await interaction.deferReply({ ephemeral: true }).catch(err => {
+            console.error(`[CLEAR] Erro ao deferir:`, err);
+            return;
+        });
 
-        let numero = Number(interaction.options.getNumber('quantidade'));
-        if (isNaN(numero) || numero > 2000 || numero <= 0) {
-            return interaction.reply({ ephemeral: true, content: `${dbe.get(`13`)} | O comando só apaga entre \`1 - 2000\` mensagens!` });
-        }
+        try {
+            // Permissão: apenas usuários com ManageChannels
+            if (!interaction.member.permissions.has(Discord.PermissionFlagsBits.ManageChannels)) {
+                const emojiErro = dbe.get(`13`) || '❌';
+                return await interaction.editReply({
+                    content: `${emojiErro} | Você não tem permissão para usar este comando!`
+                });
+            }
 
-        await interaction.deferReply({ ephemeral: true });
+            const numero = interaction.options.getNumber('quantidade');
+            if (isNaN(numero) || numero > 2000 || numero <= 0) {
+                const emojiErro = dbe.get(`13`) || '❌';
+                return await interaction.editReply({
+                    content: `${emojiErro} | O comando só apaga entre \`1 - 2000\` mensagens!`
+                });
+            }
 
-        let deletedCount = 0;
-        let failedToDelete = 0;
+            let restante = numero;
+            let deletadas = 0;
+            let falhas = 0;
 
-        async function deleteMsg() {
-            try {
-                let messages = await interaction.channel.messages.fetch({ limit: Math.min(100, numero) });
-                if (!messages.size) {
-                    return interaction.editReply({
-                        content: `${dbe.get(`6`)} | **${deletedCount}** mensagens excluídas do chat.${failedToDelete > 0 ? `\n${dbe.get("2")} | Algumas mensagens não puderam ser apagadas por serem muito antigas.` : ''}`
-                    });
+            // Função assíncrona recursiva para lotes de 100
+            const deletarLote = async () => {
+                try {
+                    const limit = Math.min(100, restante);
+                    const messages = await interaction.channel.messages.fetch({ limit });
+
+                    if (!messages.size) {
+                        // Sem mais mensagens para apagar
+                        const sucessoEmoji = dbe.get(`6`) || '✅';
+                        const avisoEmoji = dbe.get("2") || '⚠️';
+                        let msg = `${sucessoEmoji} | **${deletadas}** mensagens excluídas do chat.`;
+                        if (falhas > 0) msg += `\n${avisoEmoji} | Algumas mensagens não puderam ser apagadas por serem muito antigas.`;
+                        return await interaction.editReply({ content: msg });
+                    }
+
+                    // Filtra mensagens com menos de 14 dias (limite do bulkDelete)
+                    const validas = messages.filter(msg => (Date.now() - msg.createdTimestamp) < 1209600000);
+                    falhas += messages.size - validas.size;
+
+                    if (validas.size > 0) {
+                        const deleted = await interaction.channel.bulkDelete(validas, true);
+                        deletadas += deleted.size;
+                        restante -= deleted.size;
+                    }
+
+                    if (restante > 0 && validas.size > 0) {
+                        // Aguarda 500ms para próximo lote
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        return await deletarLote();
+                    } else {
+                        const sucessoEmoji = dbe.get(`6`) || '✅';
+                        const avisoEmoji = dbe.get("2") || '⚠️';
+                        let msg = `${sucessoEmoji} | **${deletadas}** mensagens foram excluídas do chat.`;
+                        if (falhas > 0) msg += `\n${avisoEmoji} | Algumas mensagens não puderam ser apagadas por serem muito antigas.`;
+                        return await interaction.editReply({ content: msg });
+                    }
+                } catch (err) {
+                    console.error(`[CLEAR] Erro durante exclusão:`, err);
+                    const emojiErro = dbe.get(`13`) || '❌';
+                    return await interaction.editReply({
+                        content: `${emojiErro} | Ocorreu um erro ao apagar mensagens! Algumas podem ser antigas demais ou ocorreu um erro interno.`
+                    }).catch(() => {});
                 }
+            };
 
-                let filteredMessages = messages.filter(msg => (Date.now() - msg.createdTimestamp) < 1209600000);
-                failedToDelete += messages.size - filteredMessages.size;
-                
-                let deleted = await interaction.channel.bulkDelete(filteredMessages, true);
-                deletedCount += deleted.size;
-                numero -= deleted.size;
+            await deletarLote();
 
-                if (numero > 0 && deleted.size > 0) {
-                    setTimeout(deleteMsg, 500);
+        } catch (error) {
+            console.error(`[CLEAR] Erro na execução:`, error);
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({
+                        content: `❌ | Ocorreu um erro interno ao executar a limpeza. Tente novamente.`
+                    });
                 } else {
-                    return interaction.editReply({
-                        content: `${dbe.get(`6`)} | **${deletedCount}** mensagens foram excluídas do chat.${failedToDelete > 0 ? `\n${dbe.get("2")} | Algumas mensagens não puderam ser apagadas por serem muito antigas.` : ''}`,
+                    await interaction.followUp({
+                        content: `❌ | Erro inesperado.`,
                         ephemeral: true
                     });
                 }
-            } catch (err) {
-                console.error("Erro ao apagar mensagens:", err);
-                return interaction.editReply({
-                    content: `${dbe.get(`13`)} | Ocorreu um erro ao apagar mensagens! Algumas podem ser antigas demais ou ocorreu um erro interno.`,
-                    ephemeral: true
-                });
+            } catch (replyErr) {
+                console.error(`[CLEAR] Falha ao enviar mensagem de erro:`, replyErr);
             }
         }
-        deleteMsg();
     }
 };
