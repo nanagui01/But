@@ -1,6 +1,6 @@
-const { EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle, ApplicationCommandType, ApplicationCommandOptionType } = require("discord.js")
-const config = require('../../config.json')
-const { JsonDatabase, } = require("wio.db");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle, ApplicationCommandType, ApplicationCommandOptionType } = require("discord.js");
+const { JsonDatabase } = require("wio.db");
+
 const emj = new JsonDatabase({ databasePath: "./json/emojis.json" });
 const dbp = new JsonDatabase({ databasePath: "./json/perms.json" });
 const dbc = new JsonDatabase({ databasePath: "./json/botconfig.json" });
@@ -9,407 +9,402 @@ module.exports = {
     name: 'say',
     description: "🤖 | Envie uma mensagem normal personalizada",
     options: [
-
         {
             name: 'channel',
             description: 'Qual canal será enviado?',
             type: ApplicationCommandOptionType.Channel,
             required: true
         },
-
     ],
     run: async (client, interaction) => {
-        if (interaction.user.id !== dbp.get(`${interaction.user.id}`)) {
-            interaction.reply({ ephemeral:true, content: `${emj.get(`13`)} | Você não tem permissão para usar este comando!`})
+        // Defer para evitar timeout
+        await interaction.deferReply({ ephemeral: true }).catch(err => {
+            console.error(`[SAY] Erro ao deferir:`, err);
             return;
-        }
-        let channel = interaction.options.getChannel('channel')
-        let mensagem;
-        let imagem;
-        let buttons = []
-        let embed = new EmbedBuilder()
-        .setTitle("Configure abaixo os campos da mensagem que deseja configurar.")
-        .setFooter({
-            text: "Clique em cancelar para cancelar o anúncio."
-        })
-        .setColor(dbc.get(`color`))
-        const rownormal = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-            .setStyle(2)
-            .setCustomId(`configmsg`)
-            .setLabel(`Alterar Mensagem`),
-            new ButtonBuilder()
-            .setStyle(2)
-            .setCustomId(`configimg`)
-            .setLabel(`Alterar Imagem`),
-            new ButtonBuilder()
-            .setStyle(2)
-            .setCustomId(`configbuttons`)
-            .setLabel(`Configurar Botões`)
-        )
-        const rowfinal = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId('cancelar')
-                .setLabel('Cancelar')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setCustomId('send')
-                .setLabel('⠀⠀⠀⠀⠀Enviar⠀⠀⠀⠀⠀')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setCustomId('previw')
-                .setLabel('⠀Preview⠀')
-                .setStyle(ButtonStyle.Primary),
-        )
+        });
 
-        const msg = await interaction.reply({ embeds: [embed], components: [rownormal, rowfinal]})
-
-        const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 360_000 });
-        const collector2 = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 360_000 });
-        collector2.on('collect', i => {
-            if (i.user.id === interaction.user.id) {
-                if (i.customId === "configbuttonadd") {
-                    const date = 'edit_' + Date.now();
-                    const collectorFilter = i => {
-                        return i.user.id === interaction.user.id && i.customId == date;
-                    };
-
-                    const modal = new ModalBuilder()
-                        .setCustomId(date)
-                        .setTitle('Adicionar Botão')
-                        .addComponents(
-                            new ActionRowBuilder()
-                                .addComponents(
-                                    new TextInputBuilder()
-                                    .setCustomId('text')
-                                    .setLabel("Nome do botão")
-                                    .setPlaceholder(`Qual seria o nome do botão?`)
-                                    .setStyle(TextInputStyle.Short),
-
-                                )
-                        )
-                        .addComponents(
-                            new ActionRowBuilder()
-                            .addComponents(
-                                new TextInputBuilder()
-                                .setCustomId('text2')
-                                .setRequired(false)
-                                .setLabel("Emoji do botão")
-                                .setPlaceholder(`Qual seria o emoji do botão?`)
-                                .setMaxLength(1)
-                                .setStyle(TextInputStyle.Short),
-                            )
-                        )
-                        .addComponents(
-                            new ActionRowBuilder()
-                            .addComponents(
-                                new TextInputBuilder()
-                                .setCustomId('text3')
-                                .setLabel("Link do botão")
-                                .setPlaceholder(`Qual seria o link do botão?`)
-                                .setStyle(TextInputStyle.Short),
-                            )
-                        )
-                    i.showModal(modal)
-                    i.awaitModalSubmit({ time: 600_000, filter: collectorFilter })
-                        .then(i => {
-                            const nmrbutton = Number(buttons.length)
-                            if (nmrbutton >= 5) {
-                                i.reply({ content: `${emj.get(`13`)} **|** Não é possível adicionar mais um botão!`, ephemeral:true})
-                                return;
-                            }
-                            const link = i.fields.getTextInputValue('text3')
-                            const emoji = i.fields.getTextInputValue('text2') || ""
-                            const nome = i.fields.getTextInputValue('text')
-
-                            let lala;
-                            if (link.startsWith("https://")) {
-                                lala = link
-                            } else {
-                                i.reply({ content: `${emj.get(`13`)} **|** Envie um link válido!`, ephemeral:true})
-                                return;
-                            }
-                            const emojiRegex = /[\u{1F300}-\u{1F5FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
-                            if (emoji) {
-                                if (emojiRegex.test(emoji)) {
-                                } else if (emoji.startsWith("<")) {
-                                } else {
-                                    i.reply({ content: `${emj.get(`13`)} **|** Envie um emoji válido!`, ephemeral:true})
-                                    return;
-                                }
-                            }
-                            buttons.push(
-                                {
-                                    nome: nome,
-                                    emoji: emoji,
-                                    link: link
-                                }
-                            )
-                            let but = ""
-                            buttons.map((entry, index) => {but += `**Botão ${index +1}**\nNome: ${entry.nome}\nEmoji: ${entry.emoji || "Não tem Emoji!"}\nLink: [Aqui](${entry.link})\n\n`;})
-                            const embed = new EmbedBuilder()
-                            .setTitle(`Configurando Botões`)
-                            .setDescription(`Aqui estão os botões:\n\n${but}`)
-                            .setColor(dbc.get(`color`))
-                            const row = new ActionRowBuilder()
-                            .addComponents(
-                                new ButtonBuilder()
-                                .setStyle(2)
-                                .setCustomId(`configbuttonadd`)
-                                .setLabel(`Adicionar Botão`)
-                                .setEmoji(emj.get(`20`)),
-                                new ButtonBuilder()
-                                .setStyle(2)
-                                .setCustomId(`configbuttonsub`)
-                                .setLabel(`Remover Botão`)
-                                .setEmoji(emj.get(`21`)),
-                                new ButtonBuilder()
-                                .setStyle(2)
-                                .setCustomId(`configbuttonvoltar`)
-                                .setLabel(`Voltar`)
-                                .setEmoji(emj.get(`29`))
-                            )
-                            i.deferUpdate()
-                            msg.edit({ components: [row, rowfinal], embeds: [embed]})
-                    })
-                } else if (i.customId === "configbuttonsub") {
-                    const date = 'edit_' + Date.now();
-                    const collectorFilter = i => {
-                        return i.user.id === interaction.user.id && i.customId == date;
-                    };
-                    if (buttons.length <= 0) {
-                        i.reply({ content: `${emj.get(`13`)} **|** Não é possível remover mais um botão!`, ephemeral:true})
-                        return;
-                    }
-
-                    const modal = new ModalBuilder()
-                        .setCustomId(date)
-                        .setTitle('Remover Botão')
-                        .addComponents(
-                            new ActionRowBuilder()
-                                .addComponents(
-                                    new TextInputBuilder()
-                                    .setCustomId('text')
-                                    .setLabel("ID do botão")
-                                    .setPlaceholder(`Qual seria o id do botão?`)
-                                    .setStyle(TextInputStyle.Short),
-                                )
-                        )
-                    i.showModal(modal)
-                    i.awaitModalSubmit({ time: 600_000, filter: collectorFilter })
-                        .then(i => {
-                            
-                            const id = 1 + Number(i.fields.getTextInputValue('text'))
-                            const idvdd = Number(id) - 2
-                            if (isNaN(id)) {
-                                i.reply({ content: `${emj.get(`13`)} **|** Coloque um número!`, ephemeral:true})
-                                return;
-                            }
-                            if (id < buttons.length) {
-                                i.reply({ content: `${emj.get(`13`)} **|** Escreva um número entre \`${buttons.length} - 1\`!`, ephemeral:true})
-                                return;
-                            }
-                            if (id > buttons.length) {
-                                i.reply({ content: `${emj.get(`13`)} **|** Escreva um número entre \`${buttons.length} - 1\`! 1aasd`, ephemeral:true})
-                                return;
-                            }
-                            
-
-                            buttons.splice(idvdd, 1);
-
-                            let but = "";
-                            buttons.map((entry, index) => {but += `**Botão ${index +1}**\nNome: ${entry.nome}\nEmoji: ${entry.emoji || "Não tem Emoji!"}\nLink: [Aqui](${entry.link})\n\n`;})
-                            const embed = new EmbedBuilder()
-                            .setTitle(`Configurando Botões`)
-                            .setDescription(`Aqui estão os botões:\n\n${but || "Nenhum até agora :("}`)
-                            .setColor(dbc.get(`color`))
-                            const row = new ActionRowBuilder()
-                            .addComponents(
-                                new ButtonBuilder()
-                                .setStyle(2)
-                                .setCustomId(`configbuttonadd`)
-                                .setLabel(`Adicionar Botão`)
-                                .setEmoji(emj.get(`20`)),
-                                new ButtonBuilder()
-                                .setStyle(2)
-                                .setCustomId(`configbuttonsub`)
-                                .setLabel(`Remover Botão`)
-                                .setEmoji(emj.get(`21`)),
-                                new ButtonBuilder()
-                                .setStyle(2)
-                                .setCustomId(`configbuttonvoltar`)
-                                .setLabel(`Voltar`)
-                                .setEmoji(emj.get(`29`))
-                            )
-                            i.deferUpdate();
-                            msg.edit({ components: [row, rowfinal], embeds: [embed]})
-                        })
-                        .catch(err => { return err });
-                }
+        try {
+            // Permissão corrigida
+            if (!dbp.has(interaction.user.id)) {
+                const emojiErro = emj.get(`13`) || '❌';
+                return await interaction.editReply({
+                    content: `${emojiErro} | Você não tem permissão para usar este comando!`
+                });
             }
-        })
-        collector.on('collect', i => {
-            if (i.user.id === interaction.user.id) {
-                if (i.customId == 'cancelar') {
-                    i.deferUpdate()
-                    i.deleteReply()
-                } else if (i.customId == 'previw') {
-                    const row = new ActionRowBuilder()
-                    buttons.map(entry => {
-                        const button = new ButtonBuilder()
-                            .setStyle(5)
-                            .setLabel(entry.nome)
-                            .setURL(entry.link);
-                        
-                        // Só chama .setEmoji se entry.emoji estiver definido
-                        if (entry.emoji) {
-                            button.setEmoji(entry.emoji);
-                        }
-                    
-                        row.addComponents(button);
-                    });
-                    let sendOptions = {
-                        content: mensagem,
-                        ephemeral:true
-                    };
-                    // Adicione a propriedade 'components' apenas se houver botões no row
-                    if (row.components.length > 0) {
-                        sendOptions.components = [row];
-                    }
-                    if (imagem) {
-                        sendOptions.files = [imagem];
-                    }
-                    i.reply(sendOptions).catch(err => {
-                        i.reply({
-                            content: `${emj.get(`13`)} **|** Houve um erro ao processar o anuncio`,
-                            ephemeral: true
-                        })
-                    })
-                } else if (i.customId == 'send') {
-                    
-                    i.deleteReply()
-                    const row = new ActionRowBuilder()
-                    buttons.map(entry => {
-                        const button = new ButtonBuilder()
-                            .setStyle(5)
-                            .setLabel(entry.nome)
-                            .setURL(entry.link);
-                        
-                        // Só chama .setEmoji se entry.emoji estiver definido
-                        if (entry.emoji) {
-                            button.setEmoji(entry.emoji);
-                        }
-                    
-                        row.addComponents(button);
-                    });
-                    let sendOptions = {
-                        content: mensagem
-                    };
-                    if (imagem) {
-                        sendOptions.files = [imagem];
-                    }
-                    // Adicione a propriedade 'components' apenas se houver botões no row
-                    if (row.components.length > 0) {
-                        sendOptions.components = [row];
-                    }
-                    i.deferUpdate()
-                    channel.send(sendOptions).catch(() => {
-                        i.reply({
-                            content: `${emj.get(`13`)} **|** Houve um erro ao processar o anuncio`,
-                            ephemeral: true
-                        })
-                    })
-                } else if (i.customId == 'configmsg') {
-                    const date = 'edit_' + Date.now();
-                    const collectorFilter = i => {
-                        return i.user.id === interaction.user.id && i.customId == date;
-                    };
 
-                    const modal = new ModalBuilder()
-                        .setCustomId(date)
-                        .setTitle('Mensagem')
-                        .addComponents(
-                            new ActionRowBuilder()
-                                .addComponents(
-                                    new TextInputBuilder()
-                                        .setCustomId('text')
-                                        .setLabel("Qual seria a nova mensagem?")
-                                        .setStyle(2)
-                                )
-                        )
-                    i.showModal(modal)
-                    i.awaitModalSubmit({ time: 600_000, filter: collectorFilter })
-                        .then(i => {
-                            i.deferUpdate();
-                            mensagem = i.fields.getTextInputValue('text')
-                        })
-                        .catch(err => { return err });
-                } else if (i.customId == 'configimg') {
-                    const date = 'edit_' + Date.now();
-                    const collectorFilter = i => {
-                        return i.user.id === interaction.user.id && i.customId == date;
-                    };
+            const channel = interaction.options.getChannel('channel');
+            if (!channel) {
+                return await interaction.editReply({ content: '❌ | Canal não encontrado.' });
+            }
 
-                    const modal = new ModalBuilder()
-                        .setCustomId(date)
-                        .setTitle('Imagem ')
-                        .addComponents(
-                            new ActionRowBuilder()
-                                .addComponents(
-                                    new TextInputBuilder()
-                                        .setCustomId('text')
-                                        .setLabel("Qual seria a nova imagem?")
-                                        .setPlaceholder(`Envie o link dela!`)
-                                        .setStyle(TextInputStyle.Short)
-                                )
-                        )
-                    i.showModal(modal)
-                    i.awaitModalSubmit({ time: 600_000, filter: collectorFilter})
-                        .then(i => {
-                            i.deferUpdate();
-                            const link = i.fields.getTextInputValue('text')
-                            if (link.startsWith("https://")) {
-                                imagem = link
-                            } else {
-                                i.reply({ content: `${emj.get(`13`)} **|** Envie um link válido!`, ephemeral:true})
-                            }
-                        })
-                        .catch(err => { return err });
-                } else if (i.customId === "configbuttons") {
-                    let but = "Nenhum até agora :("
-                    buttons.map((entry, index) => {but += `**Botão ${index +1}**\nNome: ${entry.nome}\nEmoji: ${entry.emoji || "Não tem Emoji!"}\nLink: [Aqui](${entry.link})\n\n`;})
-                    const embed = new EmbedBuilder()
+            let mensagem = '';
+            let imagem = null; // Será string (link) para AttachmentBuilder
+            let buttons = []; // Array de { nome, emoji, link }
+
+            const embedBase = new EmbedBuilder()
+                .setTitle("Configure abaixo os campos da mensagem que deseja configurar.")
+                .setFooter({ text: "Clique em cancelar para cancelar." })
+                .setColor(dbc.get(`color`) || 0x2b2d31);
+
+            // Linha de configuração (normal)
+            const rowNormal = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setStyle(2).setCustomId(`configmsg`).setLabel(`Alterar Mensagem`),
+                new ButtonBuilder().setStyle(2).setCustomId(`configimg`).setLabel(`Alterar Imagem`),
+                new ButtonBuilder().setStyle(2).setCustomId(`configbuttons`).setLabel(`Configurar Botões`)
+            );
+
+            // Linha final (cancelar, enviar, preview)
+            const rowFinal = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('cancelar').setLabel('Cancelar').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('send').setLabel('⠀⠀⠀⠀⠀Enviar⠀⠀⠀⠀⠀').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('previw').setLabel('⠀Preview⠀').setStyle(ButtonStyle.Primary),
+            );
+
+            const msg = await interaction.editReply({
+                embeds: [embedBase],
+                components: [rowNormal, rowFinal]
+            }).catch(async (err) => {
+                console.error('[SAY] Erro ao editar reply inicial:', err);
+                return await interaction.followUp({ content: '❌ Erro ao criar painel.', ephemeral: true });
+            });
+            if (!msg) return;
+
+            // Coletor único (gerencia todos os botões)
+            const collector = msg.createMessageComponentCollector({
+                componentType: ComponentType.Button,
+                time: 360_000 // 6 minutos
+            });
+
+            // Função auxiliar para construir a ActionRow de botões customizados
+            const buildButtonRow = () => {
+                const row = new ActionRowBuilder();
+                buttons.forEach(entry => {
+                    const btn = new ButtonBuilder()
+                        .setStyle(ButtonStyle.Link)
+                        .setLabel(entry.nome)
+                        .setURL(entry.link);
+                    if (entry.emoji) btn.setEmoji(entry.emoji);
+                    row.addComponents(btn);
+                });
+                return row.components.length > 0 ? [row] : [];
+            };
+
+            // Função para gerar embed de configuração de botões
+            const buildButtonsEmbed = () => {
+                let but = '';
+                buttons.forEach((entry, index) => {
+                    but += `**Botão ${index + 1}**\nNome: ${entry.nome}\nEmoji: ${entry.emoji || "Nenhum"}\nLink: [Aqui](${entry.link})\n\n`;
+                });
+                return new EmbedBuilder()
                     .setTitle(`Configurando Botões`)
                     .setDescription(`Aqui estão os botões:\n\n${but || "Nenhum até agora :("}`)
-                    .setColor(dbc.get(`color`))
-                    const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                        .setStyle(2)
-                        .setCustomId(`configbuttonadd`)
-                        .setLabel(`Adicionar Botão`)
-                        .setEmoji(emj.get(`20`)),
-                        new ButtonBuilder()
-                        .setStyle(2)
-                        .setCustomId(`configbuttonsub`)
-                        .setLabel(`Remover Botão`)
-                        .setEmoji(emj.get(`21`)),
-                        new ButtonBuilder()
-                        .setStyle(2)
-                        .setCustomId(`configbuttonvoltar`)
-                        .setLabel(`Voltar`)
-                        .setEmoji(emj.get(`29`))
-                    )
-                    i.deferUpdate();
-                    msg.edit({ components: [row, rowfinal], embeds: [embed]})
-                } else if (i.customId === "configbuttonvoltar") {
-                    i.deferUpdate();
-                    msg.edit({ components: [rownormal, rowfinal], embeds: [embed]})
+                    .setColor(dbc.get(`color`) || 0x2b2d31);
+            };
+
+            // Função para construir opções de envio (preview ou canal)
+            const buildSendOptions = async (isPreview = false) => {
+                const options = { content: mensagem || undefined };
+                if (isPreview) options.ephemeral = true;
+
+                if (imagem) {
+                    try {
+                        const attachment = new AttachmentBuilder(imagem, { name: 'imagem.png' });
+                        options.files = [attachment];
+                    } catch (e) {
+                        // Link inválido, ignora
+                    }
                 }
 
+                const btnRows = buildButtonRow();
+                if (btnRows.length > 0) options.components = btnRows;
+
+                return options;
+            };
+
+            collector.on('collect', async (btnInteraction) => {
+                // Apenas o autor do comando pode interagir
+                if (btnInteraction.user.id !== interaction.user.id) {
+                    return await btnInteraction.reply({
+                        content: `${emj.get('13') || '❌'} | Apenas ${interaction.user} pode usar esses botões.`,
+                        ephemeral: true
+                    }).catch(() => {});
+                }
+
+                try {
+                    const customId = btnInteraction.customId;
+
+                    // --- Botões de ação principal ---
+                    if (customId === 'cancelar') {
+                        await btnInteraction.deferUpdate();
+                        await btnInteraction.message.delete().catch(() => {});
+                    }
+                    else if (customId === 'previw') {
+                        const options = await buildSendOptions(true);
+                        await btnInteraction.reply(options).catch(async (err) => {
+                            console.error('[SAY] Erro no preview:', err);
+                            await btnInteraction.reply({
+                                content: `${emj.get('13') || '❌'} **|** Erro ao gerar preview. Verifique os dados.`,
+                                ephemeral: true
+                            }).catch(() => {});
+                        });
+                    }
+                    else if (customId === 'send') {
+                        await btnInteraction.deferUpdate();
+                        const options = await buildSendOptions(false);
+
+                        try {
+                            await channel.send(options);
+                            await btnInteraction.message.delete().catch(() => {});
+                        } catch (err) {
+                            console.error('[SAY] Erro ao enviar mensagem:', err);
+                            await btnInteraction.followUp({
+                                content: `${emj.get('13') || '❌'} **|** Houve um erro ao enviar a mensagem. Verifique minhas permissões no canal.`,
+                                ephemeral: true
+                            }).catch(() => {});
+                        }
+                    }
+
+                    // --- Configuração de mensagem ---
+                    else if (customId === 'configmsg') {
+                        const modalId = 'modal_msg_' + Date.now();
+                        const modal = new ModalBuilder()
+                            .setCustomId(modalId)
+                            .setTitle('Mensagem')
+                            .addComponents(
+                                new ActionRowBuilder().addComponents(
+                                    new TextInputBuilder()
+                                        .setCustomId('texto')
+                                        .setLabel("Qual seria a nova mensagem?")
+                                        .setStyle(TextInputStyle.Paragraph)
+                                        .setRequired(true)
+                                )
+                            );
+
+                        await btnInteraction.showModal(modal);
+                        const submitted = await btnInteraction.awaitModalSubmit({
+                            time: 600_000,
+                            filter: (modalInt) => modalInt.user.id === interaction.user.id && modalInt.customId === modalId
+                        }).catch(() => null);
+
+                        if (submitted) {
+                            await submitted.deferUpdate();
+                            mensagem = submitted.fields.getTextInputValue('texto');
+                        }
+                    }
+
+                    // --- Configuração de imagem ---
+                    else if (customId === 'configimg') {
+                        const modalId = 'modal_img_' + Date.now();
+                        const modal = new ModalBuilder()
+                            .setCustomId(modalId)
+                            .setTitle('Imagem')
+                            .addComponents(
+                                new ActionRowBuilder().addComponents(
+                                    new TextInputBuilder()
+                                        .setCustomId('link')
+                                        .setLabel("Qual seria a imagem? Cole o link.")
+                                        .setPlaceholder('https://...')
+                                        .setStyle(TextInputStyle.Short)
+                                        .setRequired(true)
+                                )
+                            );
+
+                        await btnInteraction.showModal(modal);
+                        const submitted = await btnInteraction.awaitModalSubmit({
+                            time: 600_000,
+                            filter: (modalInt) => modalInt.user.id === interaction.user.id && modalInt.customId === modalId
+                        }).catch(() => null);
+
+                        if (submitted) {
+                            const link = submitted.fields.getTextInputValue('link');
+                            if (link.startsWith('https://')) {
+                                await submitted.deferUpdate();
+                                imagem = link;
+                            } else {
+                                await submitted.reply({
+                                    content: `${emj.get('13') || '❌'} **|** Envie um link válido (https://).`,
+                                    ephemeral: true
+                                }).catch(() => {});
+                            }
+                        }
+                    }
+
+                    // --- Abrir configuração de botões ---
+                    else if (customId === 'configbuttons') {
+                        await btnInteraction.deferUpdate();
+                        const embedBtns = buildButtonsEmbed();
+                        const rowBtns = new ActionRowBuilder().addComponents(
+                            new ButtonBuilder().setStyle(2).setCustomId('configbuttonadd').setLabel('Adicionar Botão').setEmoji(emj.get('20') || '➕'),
+                            new ButtonBuilder().setStyle(2).setCustomId('configbuttonsub').setLabel('Remover Botão').setEmoji(emj.get('21') || '➖'),
+                            new ButtonBuilder().setStyle(2).setCustomId('configbuttonvoltar').setLabel('Voltar').setEmoji(emj.get('29') || '↩️')
+                        );
+                        await msg.edit({ components: [rowBtns, rowFinal], embeds: [embedBtns] });
+                    }
+
+                    // --- Voltar da config de botões ---
+                    else if (customId === 'configbuttonvoltar') {
+                        await btnInteraction.deferUpdate();
+                        await msg.edit({ components: [rowNormal, rowFinal], embeds: [embedBase] });
+                    }
+
+                    // --- Adicionar botão ---
+                    else if (customId === 'configbuttonadd') {
+                        if (buttons.length >= 5) {
+                            return await btnInteraction.reply({
+                                content: `${emj.get('13') || '❌'} **|** Limite máximo de 5 botões atingido.`,
+                                ephemeral: true
+                            }).catch(() => {});
+                        }
+
+                        const modalId = 'modal_addbtn_' + Date.now();
+                        const modal = new ModalBuilder()
+                            .setCustomId(modalId)
+                            .setTitle('Adicionar Botão')
+                            .addComponents(
+                                new ActionRowBuilder().addComponents(
+                                    new TextInputBuilder().setCustomId('nome').setLabel('Nome do botão').setStyle(TextInputStyle.Short).setRequired(true)
+                                ),
+                                new ActionRowBuilder().addComponents(
+                                    new TextInputBuilder().setCustomId('emoji').setLabel('Emoji do botão (opcional)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(10)
+                                ),
+                                new ActionRowBuilder().addComponents(
+                                    new TextInputBuilder().setCustomId('link').setLabel('Link do botão').setPlaceholder('https://...').setStyle(TextInputStyle.Short).setRequired(true)
+                                )
+                            );
+
+                        await btnInteraction.showModal(modal);
+                        const submitted = await btnInteraction.awaitModalSubmit({
+                            time: 600_000,
+                            filter: (modalInt) => modalInt.user.id === interaction.user.id && modalInt.customId === modalId
+                        }).catch(() => null);
+
+                        if (submitted) {
+                            const nome = submitted.fields.getTextInputValue('nome');
+                            const emojiInput = submitted.fields.getTextInputValue('emoji').trim();
+                            const link = submitted.fields.getTextInputValue('link');
+
+                            if (!link.startsWith('https://')) {
+                                return await submitted.reply({
+                                    content: `${emj.get('13') || '❌'} **|** Envie um link válido (https://).`,
+                                    ephemeral: true
+                                }).catch(() => {});
+                            }
+
+                            // Validação simples de emoji (unicode, <a:...>, <:...>)
+                            const emojiValido = emojiInput === '' ||
+                                /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(emojiInput) ||
+                                /^<a?:\w+:\d+>$/.test(emojiInput);
+
+                            if (emojiInput !== '' && !emojiValido) {
+                                return await submitted.reply({
+                                    content: `${emj.get('13') || '❌'} **|** Emoji inválido.`,
+                                    ephemeral: true
+                                }).catch(() => {});
+                            }
+
+                            buttons.push({ nome, emoji: emojiInput || null, link });
+                            await submitted.deferUpdate();
+
+                            const embedBtns = buildButtonsEmbed();
+                            const rowBtns = new ActionRowBuilder().addComponents(
+                                new ButtonBuilder().setStyle(2).setCustomId('configbuttonadd').setLabel('Adicionar Botão').setEmoji(emj.get('20') || '➕'),
+                                new ButtonBuilder().setStyle(2).setCustomId('configbuttonsub').setLabel('Remover Botão').setEmoji(emj.get('21') || '➖'),
+                                new ButtonBuilder().setStyle(2).setCustomId('configbuttonvoltar').setLabel('Voltar').setEmoji(emj.get('29') || '↩️')
+                            );
+                            await msg.edit({ components: [rowBtns, rowFinal], embeds: [embedBtns] });
+                        }
+                    }
+
+                    // --- Remover botão ---
+                    else if (customId === 'configbuttonsub') {
+                        if (buttons.length === 0) {
+                            return await btnInteraction.reply({
+                                content: `${emj.get('13') || '❌'} **|** Nenhum botão para remover.`,
+                                ephemeral: true
+                            }).catch(() => {});
+                        }
+
+                        const modalId = 'modal_rmbtn_' + Date.now();
+                        const modal = new ModalBuilder()
+                            .setCustomId(modalId)
+                            .setTitle('Remover Botão')
+                            .addComponents(
+                                new ActionRowBuilder().addComponents(
+                                    new TextInputBuilder()
+                                        .setCustomId('id')
+                                        .setLabel(`Número do botão (1 a ${buttons.length})`)
+                                        .setStyle(TextInputStyle.Short)
+                                        .setRequired(true)
+                                )
+                            );
+
+                        await btnInteraction.showModal(modal);
+                        const submitted = await btnInteraction.awaitModalSubmit({
+                            time: 600_000,
+                            filter: (modalInt) => modalInt.user.id === interaction.user.id && modalInt.customId === modalId
+                        }).catch(() => null);
+
+                        if (submitted) {
+                            const num = parseInt(submitted.fields.getTextInputValue('id'));
+                            if (isNaN(num) || num < 1 || num > buttons.length) {
+                                return await submitted.reply({
+                                    content: `${emj.get('13') || '❌'} **|** Digite um número entre 1 e ${buttons.length}.`,
+                                    ephemeral: true
+                                }).catch(() => {});
+                            }
+
+                            buttons.splice(num - 1, 1);
+                            await submitted.deferUpdate();
+
+                            const embedBtns = buildButtonsEmbed();
+                            const rowBtns = new ActionRowBuilder().addComponents(
+                                new ButtonBuilder().setStyle(2).setCustomId('configbuttonadd').setLabel('Adicionar Botão').setEmoji(emj.get('20') || '➕'),
+                                new ButtonBuilder().setStyle(2).setCustomId('configbuttonsub').setLabel('Remover Botão').setEmoji(emj.get('21') || '➖'),
+                                new ButtonBuilder().setStyle(2).setCustomId('configbuttonvoltar').setLabel('Voltar').setEmoji(emj.get('29') || '↩️')
+                            );
+                            await msg.edit({ components: [rowBtns, rowFinal], embeds: [embedBtns] });
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[SAY] Erro no coletor (${btnInteraction.customId}):`, err);
+                    // Tenta responder se possível
+                    if (!btnInteraction.replied && !btnInteraction.deferred) {
+                        await btnInteraction.reply({
+                            content: `${emj.get('13') || '❌'} | Ocorreu um erro inesperado.`,
+                            ephemeral: true
+                        }).catch(() => {});
+                    }
+                }
+            });
+
+            collector.on('end', async (collected, reason) => {
+                if (reason === 'time') {
+                    try {
+                        await msg.edit({
+                            components: [],
+                            embeds: [
+                                new EmbedBuilder()
+                                    .setDescription('⏰ | Tempo de configuração expirado.')
+                                    .setColor('#ff0000')
+                            ]
+                        });
+                    } catch (e) {
+                        console.error('[SAY] Erro ao editar mensagem expirada:', e);
+                    }
+                }
+            });
+
+        } catch (error) {
+            console.error(`[SAY] Erro global:`, error);
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ content: '❌ | Ocorreu um erro interno ao executar o comando.' });
+                } else {
+                    await interaction.followUp({ content: '❌ | Erro inesperado.', ephemeral: true });
+                }
+            } catch (replyErr) {
+                console.error(`[SAY] Falha ao enviar erro:`, replyErr);
             }
-        })
+        }
     }
-}
+};
