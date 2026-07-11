@@ -1,134 +1,578 @@
-const { ApplicationCommandOptionType, ApplicationCommandType, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require("discord.js");
+const {
+    ApplicationCommandOptionType,
+    ApplicationCommandType,
+    EmbedBuilder,
+    ButtonBuilder,
+    ActionRowBuilder,
+    ButtonStyle
+} = require("discord.js");
+
 const { JsonDatabase } = require("wio.db");
 
-const dbp = new JsonDatabase({ databasePath: "./json/perms.json" });
-const pkg = new JsonDatabase({ databasePath: "./package.json" });
-const dbe = new JsonDatabase({ databasePath: "./json/emojis.json" });
-const dbc = new JsonDatabase({ databasePath: "./json/botconfig.json" });
-const dbep = new JsonDatabase({ databasePath: "./json/emojisGlob.json" });
-const cfg = new JsonDatabase({ databasePath: "./json/configGlob.json" });
+
+const dbp = new JsonDatabase({
+    databasePath: "./json/perms.json"
+});
+
+const pkg = new JsonDatabase({
+    databasePath: "./package.json"
+});
+
+const dbe = new JsonDatabase({
+    databasePath: "./json/emojis.json"
+});
+
+const dbc = new JsonDatabase({
+    databasePath: "./json/botconfig.json"
+});
+
+const dbep = new JsonDatabase({
+    databasePath: "./json/emojisGlob.json"
+});
+
+const cfg = new JsonDatabase({
+    databasePath: "./json/configGlob.json"
+});
+
 
 module.exports = {
+
     name: "painel",
+
     description: "Configure o seu bot",
+
     type: ApplicationCommandType.ChatInput,
+
+
     options: [
+
         {
             name: "bot",
             description: "🤖 | Configure o seu bot.",
-            type: ApplicationCommandOptionType.Subcommand,
+            type: ApplicationCommandOptionType.Subcommand
         },
+
         {
             name: "vendas",
-            description: "🤖 | Configure produtos, cupons e personalize o seu painel de vendas.",
-            type: ApplicationCommandOptionType.Subcommand,
+            description: "🤖 | Configure produtos, cupons e personalize seu painel.",
+            type: ApplicationCommandOptionType.Subcommand
         }
+
     ],
 
+
+
     run: async (client, interaction) => {
-        // Defer para ganhar tempo e garantir resposta ephemeral
-        await interaction.deferReply({ ephemeral: true }).catch(err => {
-            console.error(`[PAINEL] Erro ao deferir a interação:`, err);
-            return; // Já evita continuar se não foi possível deferir
-        });
+
+
+        // ==========================
+        // RESPOSTA INICIAL
+        // ==========================
 
         try {
-            // Verificação de permissão corrigida: apenas IDs registrados no banco
+
+            await interaction.deferReply({
+                ephemeral: true
+            });
+
+
+        } catch (error) {
+
+            console.log(
+                "[PAINEL] Interação expirada:",
+                error.message
+            );
+
+            return;
+
+        }
+
+
+
+        try {
+
+
+            // ==========================
+            // PERMISSÃO
+            // ==========================
+
+
             if (!dbp.has(interaction.user.id)) {
-                const emojiPerm = dbe.get(`13`) || '❌';
+
+
                 return await interaction.editReply({
-                    content: `${emojiPerm} | Você não tem permissão para usar este comando!`
+
+                    content:
+                    `${dbe.get("13") || "❌"} | Você não possui permissão para usar este comando.`
+
                 });
+
+
             }
 
-            const subcommand = interaction.options.getSubcommand();
+
+
+            const subcommand =
+            interaction.options.getSubcommand();
+
+
+
+            // ==========================
+            // PAINEL DE VENDAS
+            // ==========================
+
 
             if (subcommand === "vendas") {
-                // Fallbacks e validações
-                const color = dbc.get("color") || 0x2b2d31; // cor padrão segura
-                const imgVendas = cfg.get("imgVendas") || null;
-                const thumb = interaction.guild?.iconURL({ dynamic: true }) || null;
 
-                const embed = new EmbedBuilder()
-                    .setAuthor({ name: "Configurando Vendas", iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-                    .setColor(color)
-                    .setDescription(`Olá ${interaction.user} 👋.\n- Escolha abaixo qual sistema de vendas você deseja configurar.`)
-                    .setTimestamp();
 
-                if (thumb) embed.setThumbnail(thumb);
-                if (imgVendas) embed.setImage(imgVendas);
 
-                const emjcai = dbep.get(`35`) || '🛒';
-                const emjfer = dbep.get(`5`)  || '⚙️';
-                const emjbol = dbep.get(`3`)  || '💰';
-                const emjCupom = dbep.get(`24`) || '🎟️';
+                const color =
+                dbc.get("color") || 0x2b2d31;
 
-                const row1 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_produtos`).setLabel(`Painéis`).setEmoji(emjcai),
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_perso`).setLabel("Personalizar").setEmoji(emjfer),
-                );
 
-                const row2 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setStyle(1).setCustomId("config_cupom").setLabel("Cupons").setDisabled(false).setEmoji(emjCupom),
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_rendimentos`).setLabel("Rendimentos").setEmoji(emjbol),
-                );
+                const embed =
+                new EmbedBuilder()
 
-                const row3 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_hierarquiacargo`).setLabel("Hierarquia de Cargos").setEmoji(emjCupom),
-                );
+                .setAuthor({
 
-                await interaction.editReply({ embeds: [embed], components: [row1, row2, row3] });
-            }
+                    name:"Configurando Vendas",
 
-            else if (subcommand === "bot") {
-                const color = dbc.get("color") || 0x2b2d31;
-                const imgConfig = cfg.get("imgConfig") || null;
-                const version = pkg.get(`version`) || '1.0.0';
-                const ping = client.ws.ping;
-                const thumb = interaction.guild?.iconURL({ dynamic: true }) || null;
+                    iconURL:
+                    interaction.user.displayAvatarURL({
+                        dynamic:true
+                    })
 
-                const embed = new EmbedBuilder()
-                    .setAuthor({ name: "Configurando Bot", iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-                    .setColor(color)
-                    .setDescription(`Olá ${interaction.user} 👋.\n- Selecione abaixo qual opção você deseja configurar.`)
-                    .addFields(
-                        { name: `Versão:`, value: `\`${version}\``, inline: true },
-                        { name: "Latência", value: `${ping} ms`, inline: true }
-                    )
-                    .setTimestamp();
+                })
 
-                if (thumb) embed.setThumbnail(thumb);
-                if (imgConfig) embed.setImage(imgConfig);
 
-                const emjeng = dbep.get(`10`) || '🤖';
-                const emjdin = dbep.get(`9`)  || '💵';
-                const emjesc = dbep.get(`22`) || '🔧';
-                const emjAuth = dbep.get("44") || '🔐';
+                .setColor(color)
 
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_bot`).setLabel(`Bot`).setEmoji(emjeng),
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_pagamentos`).setLabel("Gerenciar Financeiro").setEmoji(emjdin),
-                );
 
-                const row2 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setStyle(1).setCustomId(`config_mod`).setLabel("Gerenciar Sistemas").setEmoji(emjesc),
-                    new ButtonBuilder().setStyle(1).setCustomId("config_auth").setDisabled(true).setLabel("Auth").setEmoji(emjAuth),
-                );
+                .setDescription(
 
-                await interaction.editReply({ embeds: [embed], components: [row, row2] });
-            }
-        } catch (error) {
-            console.error(`[PAINEL] Erro na execução do comando:`, error);
-            // Tenta responder com mensagem amigável, se a interação ainda não foi finalizada
-            try {
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({ content: '❌ Ocorreu um erro interno ao executar o comando. Tente novamente mais tarde.' });
-                } else {
-                    await interaction.reply({ content: '❌ Erro inesperado.', ephemeral: true });
+                    `Olá ${interaction.user} 👋\n\n` +
+                    `Escolha abaixo qual sistema deseja configurar.`
+
+                )
+
+
+                .setTimestamp();
+
+
+
+                const img =
+                cfg.get("imgVendas");
+
+
+                if(img)
+                    embed.setImage(img);
+
+
+
+                if(interaction.guild?.iconURL()){
+
+                    embed.setThumbnail(
+                        interaction.guild.iconURL({
+                            dynamic:true
+                        })
+                    );
+
                 }
-            } catch (replyError) {
-                console.error(`[PAINEL] Falha ao enviar mensagem de erro:`, replyError);
+
+
+
+
+                const row1 =
+                new ActionRowBuilder()
+                .addComponents(
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_produtos"
+                    )
+
+                    .setLabel(
+                        "Painéis"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("35") || "🛒"
+                    ),
+
+
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_perso"
+                    )
+
+                    .setLabel(
+                        "Personalizar"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("5") || "⚙️"
+                    )
+
+
+                );
+
+
+
+
+                const row2 =
+                new ActionRowBuilder()
+                .addComponents(
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_cupom"
+                    )
+
+                    .setLabel(
+                        "Cupons"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("24") || "🎟️"
+                    ),
+
+
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_rendimentos"
+                    )
+
+                    .setLabel(
+                        "Rendimentos"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("3") || "💰"
+                    )
+
+
+                );
+
+
+
+
+
+                const row3 =
+                new ActionRowBuilder()
+                .addComponents(
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_hierarquiacargo"
+                    )
+
+                    .setLabel(
+                        "Hierarquia de Cargos"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("24") || "🎟️"
+                    )
+
+
+                );
+
+
+
+
+                return await interaction.editReply({
+
+                    embeds:[
+                        embed
+                    ],
+
+                    components:[
+                        row1,
+                        row2,
+                        row3
+                    ]
+
+                });
+
+
+
             }
+
+
+
+
+
+
+            // ==========================
+            // PAINEL DO BOT
+            // ==========================
+
+
+
+            if(subcommand === "bot"){
+
+
+
+                const color =
+                dbc.get("color") || 0x2b2d31;
+
+
+
+                const embed =
+                new EmbedBuilder()
+
+
+                .setAuthor({
+
+                    name:
+                    "Configurando Bot",
+
+                    iconURL:
+                    interaction.user.displayAvatarURL({
+                        dynamic:true
+                    })
+
+                })
+
+
+                .setColor(color)
+
+
+                .setDescription(
+
+                    `Olá ${interaction.user} 👋\n\n` +
+                    `Selecione abaixo uma opção para configurar.`
+
+                )
+
+
+                .addFields(
+
+                    {
+
+                        name:
+                        "Versão",
+
+                        value:
+                        `\`${pkg.get("version") || "1.0.0"}\``,
+
+                        inline:true
+
+                    },
+
+
+                    {
+
+                        name:
+                        "Latência",
+
+                        value:
+                        `${client.ws.ping}ms`,
+
+                        inline:true
+
+                    }
+
+                )
+
+
+                .setTimestamp();
+
+
+
+
+                const row1 =
+                new ActionRowBuilder()
+                .addComponents(
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_bot"
+                    )
+
+                    .setLabel(
+                        "Bot"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("10") || "🤖"
+                    ),
+
+
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_pagamentos"
+                    )
+
+                    .setLabel(
+                        "Gerenciar Financeiro"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("9") || "💵"
+                    )
+
+
+                );
+
+
+
+
+                const row2 =
+                new ActionRowBuilder()
+                .addComponents(
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_mod"
+                    )
+
+                    .setLabel(
+                        "Gerenciar Sistemas"
+                    )
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("22") || "🔧"
+                    ),
+
+
+
+                    new ButtonBuilder()
+
+                    .setCustomId(
+                        "config_auth"
+                    )
+
+                    .setLabel(
+                        "Auth"
+                    )
+
+                    .setDisabled(true)
+
+                    .setStyle(
+                        ButtonStyle.Primary
+                    )
+
+                    .setEmoji(
+                        dbep.get("44") || "🔐"
+                    )
+
+
+                );
+
+
+
+
+                return await interaction.editReply({
+
+                    embeds:[
+                        embed
+                    ],
+
+                    components:[
+                        row1,
+                        row2
+                    ]
+
+                });
+
+
+            }
+
+
+
+        } catch(error){
+
+
+
+            console.error(
+                "[PAINEL] Erro:",
+                error
+            );
+
+
+
+            if(interaction.deferred || interaction.replied){
+
+
+                try{
+
+                    await interaction.editReply({
+
+                        content:
+                        "❌ Ocorreu um erro interno ao executar este comando."
+
+                    });
+
+
+                }catch(e){
+
+                    console.log(
+                        "[PAINEL] Não foi possível editar resposta:",
+                        e.message
+                    );
+
+                }
+
+
+            }
+
+
         }
+
+
     }
+
+
 };
