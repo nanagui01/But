@@ -152,13 +152,12 @@ async function bloquearBancoEfi(interaction, doc, banco, Valortotal) {
             id: `${res.loc.id}`,
         }
 
-        efipay.pixDevolution(params, body)
-            .then((resposta) => {
-                return resposta
-            })
-            .catch((error) => {
-                console.log(error)
-            })
+        try {
+            const resposta = await efipay.pixDevolution(params, body)
+            console.log("[CarrinhoAprovado] Devolução Pix confirmada:", resposta)
+        } catch (error) {
+            console.error("[CarrinhoAprovado] Erro ao devolver Pix:", error)
+        }
 
         const embed = new EmbedBuilder()
             .setAuthor({ name: `❌ Erro na compra!`, iconURL: interaction.guild.iconURL({}) })
@@ -247,11 +246,12 @@ async function bloquearBancoESales(interaction, doc, banco, Valortotal) {
             id: `${res.loc.id}`,
         }
 
-        efipay.pixDevolution(params, body)
-            .then((resposta) => {
-            })
-            .catch((error) => {
-            })
+        try {
+            const resposta = await efipay.pixDevolution(params, body)
+            console.log("[CarrinhoAprovado] Devolução Pix confirmada:", resposta)
+        } catch (error) {
+            console.error("[CarrinhoAprovado] Erro ao devolver Pix:", error)
+        }
 
         const embed = new EmbedBuilder()
             .setAuthor({ name: `❌ Erro na compra!`, iconURL: interaction.guild.iconURL({}) })
@@ -300,6 +300,7 @@ async function bloquearBancoESales(interaction, doc, banco, Valortotal) {
 }
 
 async function enviarProduto(interaction, doc, banco) {
+    try {
 
     const painel = await dc.get(`${interaction.channel.id}.painel`)
     const carrinho = await dc.get(`${interaction.channel.id}`)
@@ -308,6 +309,20 @@ async function enviarProduto(interaction, doc, banco) {
     const pdd = pd.produtos.find(a => a.nome === dc.get(`${interaction.channel.id}.produto`))
     const produto = pdd
     const cliente = interaction.guild.members.cache.get(dc.get(`${interaction.channel.id}.user`))
+    if (!pd || !produto || !Array.isArray(pd.produtos)) {
+        console.error(`[CarrinhoAprovado:enviarProduto] Painel ou produto não encontrado para o canal ${interaction.channel.id}.`)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Erro interno: produto/painel não encontrado. Contate o suporte.` }).catch(() => {})
+        return
+    }
+    if (!cliente) {
+        console.error(`[CarrinhoAprovado:enviarProduto] Cliente não encontrado no servidor para o canal ${interaction.channel.id}.`)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Erro interno: cliente não encontrado no servidor. Contate o suporte.` }).catch(() => {})
+        return
+    }
+    // Instancia o client do Mercado Pago para permitir reembolso caso falte estoque (bug corrigido: "refund" não existia nesta função)
+    const acess_token_mp = await dc.get(`${interaction.channel.id}.eSales`) === "ON" ? dbcg.get('acessToken') : dbc.get(`pagamentos.acess_token`);
+    const mpClient = new MercadoPagoConfig({ accessToken: acess_token_mp });
+    const refund = new PaymentRefund(mpClient);
     await deleteMessages(interaction)
 
     let valorTotal = `R$${Number(produto.preco * dc.get(`${interaction.channel.id}.quantidade`)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -400,8 +415,8 @@ async function enviarProduto(interaction, doc, banco) {
     db.set(`${painel}`, pd);
 
     if (pd.produtos[index].estoque.length < nmrentregas) {
-        faltou = true;
-        quantos = nmrentregas - pd.produtos[index].estoque.length;
+        let faltou = true;
+        let quantos = nmrentregas - pd.produtos[index].estoque.length;
 
 
         while (produtos.length < nmrentregas) {
@@ -572,10 +587,10 @@ async function enviarProduto(interaction, doc, banco) {
                         .setLabel(`Reembolsar Compra`)
                         .setEmoji(dbep.get(`3`))
                 )
-            if (doc === "manual") row = ""
+            if (doc === "manual") row = null
             embedentrega.data.description = ''
             embedentrega.data.fields = [{ name: `Entrega do pedido:`, value: `${txt === false ? `${filed}` : `**Todos os produtos estão em um arquivo acima.**`}` }]
-            const options = { embeds: [embed, embedentrega], components: [row] }
+            const options = { embeds: [embed, embedentrega], components: row ? [row] : [] }
             if (produtos.length > 5 || total > 1500) options.files = [filed]
             await logspriv.send(options)
         }
@@ -600,10 +615,15 @@ async function enviarProduto(interaction, doc, banco) {
             await interaction.channel.send({ content: `**${dbe.get(`2`)} Como sua DM estava fechada, resolvi mandar o's produto's comprado's aqui mesmo.**\n- Lembre-se, o canal será fechado daqui a 2 minutos!`, files: [filed] })
         }
     })
+    } catch (error) {
+        console.error("[CarrinhoAprovado:enviarProduto] Erro ao entregar produto:", error)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Ocorreu um erro ao processar a entrega do produto. Contate o suporte imediatamente, o pagamento já foi confirmado.` }).catch(() => {})
+    }
 }
 
 
 async function enviarProduto2(interaction, doc, banco) {
+    try {
 
     const painel = await dc.get(`${interaction.channel.id}.painel`)
     const carrinho = await dc.get(`${interaction.channel.id}`)
@@ -612,6 +632,16 @@ async function enviarProduto2(interaction, doc, banco) {
     const pdd = pd.produtos.find(a => a.nome === dc.get(`${interaction.channel.id}.produto`))
     const produto = pdd
     const cliente = interaction.guild.members.cache.get(dc.get(`${interaction.channel.id}.user`))
+    if (!pd || !produto || !Array.isArray(pd.produtos)) {
+        console.error(`[CarrinhoAprovado:enviarProduto2] Painel ou produto não encontrado para o canal ${interaction.channel.id}.`)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Erro interno: produto/painel não encontrado. Contate o suporte.` }).catch(() => {})
+        return
+    }
+    if (!cliente) {
+        console.error(`[CarrinhoAprovado:enviarProduto2] Cliente não encontrado no servidor para o canal ${interaction.channel.id}.`)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Erro interno: cliente não encontrado no servidor. Contate o suporte.` }).catch(() => {})
+        return
+    }
     dc.set(`${interaction.channel.id}.loc`, doc.loc.id)
     dc.set(`${interaction.channel.id}.txid`, doc.txid)
     await deleteMessages(interaction)
@@ -723,8 +753,8 @@ async function enviarProduto2(interaction, doc, banco) {
     db.set(`${painel}`, pd);
 
     if (pd.produtos[index].estoque.length < nmrentregas) {
-        faltou = true;
-        quantos = nmrentregas - pd.produtos[index].estoque.length;
+        let faltou = true;
+        let quantos = nmrentregas - pd.produtos[index].estoque.length;
 
 
         while (produtos.length < nmrentregas) {
@@ -904,10 +934,10 @@ async function enviarProduto2(interaction, doc, banco) {
                         .setLabel(`Reembolsar Compra`)
                         .setEmoji(dbep.get(`3`))
                 )
-            if (doc === "manual") row = ""
+            if (doc === "manual") row = null
             embedentrega.data.description = ''
             embedentrega.data.fields = [{ name: `Entrega do pedido:`, value: `${txt === false ? `${filed}` : `**Todos os produtos estão em um arquivo acima.**`}` }]
-            const options = { embeds: [embed, embedentrega], components: [row] }
+            const options = { embeds: [embed, embedentrega], components: row ? [row] : [] }
             if (produtos.length > 5 || total > 1500) options.files = [filed]
             await logspriv.send(options)
         }
@@ -933,9 +963,14 @@ async function enviarProduto2(interaction, doc, banco) {
             await interaction.channel.send({ content: `**${dbe.get(`2`)} Como sua DM estava fechada, resolvi mandar o's produto's comprado's aqui mesmo.**\n- Lembre-se, o canal será fechado daqui a 2 minutos!`, files: [filed] })
         }
     })
+    } catch (error) {
+        console.error("[CarrinhoAprovado:enviarProduto2] Erro ao entregar produto:", error)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Ocorreu um erro ao processar a entrega do produto. Contate o suporte imediatamente, o pagamento já foi confirmado.` }).catch(() => {})
+    }
 }
 
 async function enviarProdutoEsales(interaction, doc, banco) {
+    try {
 
     const painel = await dc.get(`${interaction.channel.id}.painel`)
     const carrinho = await dc.get(`${interaction.channel.id}`)
@@ -944,6 +979,16 @@ async function enviarProdutoEsales(interaction, doc, banco) {
     const pdd = pd.produtos.find(a => a.nome === dc.get(`${interaction.channel.id}.produto`))
     const produto = pdd
     const cliente = interaction.guild.members.cache.get(dc.get(`${interaction.channel.id}.user`))
+    if (!pd || !produto || !Array.isArray(pd.produtos)) {
+        console.error(`[CarrinhoAprovado:enviarProdutoEsales] Painel ou produto não encontrado para o canal ${interaction.channel.id}.`)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Erro interno: produto/painel não encontrado. Contate o suporte.` }).catch(() => {})
+        return
+    }
+    if (!cliente) {
+        console.error(`[CarrinhoAprovado:enviarProdutoEsales] Cliente não encontrado no servidor para o canal ${interaction.channel.id}.`)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Erro interno: cliente não encontrado no servidor. Contate o suporte.` }).catch(() => {})
+        return
+    }
     dc.set(`${interaction.channel.id}.loc`, doc.loc.id)
     dc.set(`${interaction.channel.id}.txid`, doc.txid)
     await deleteMessages(interaction)
@@ -1066,8 +1111,8 @@ async function enviarProdutoEsales(interaction, doc, banco) {
     db.set(`${painel}`, pd);
 
     if (pd.produtos[index].estoque.length < nmrentregas) {
-        faltou = true;
-        quantos = nmrentregas - pd.produtos[index].estoque.length;
+        let faltou = true;
+        let quantos = nmrentregas - pd.produtos[index].estoque.length;
 
 
         while (produtos.length < nmrentregas) {
@@ -1239,7 +1284,7 @@ async function enviarProdutoEsales(interaction, doc, banco) {
             const endToEndId = res.pix[0].endToEndId
 
 
-            if (doc === "manual") row = ""
+            if (doc === "manual") row = null
             embedentrega.data.description = ''
             embedentrega.data.fields = [{ name: `Entrega do pedido:`, value: `${txt === false ? `${filed}` : `**Todos os produtos estão em um arquivo acima.**`}` }]
             const options = { embeds: [embed, embedentrega], components: [] }
@@ -1268,6 +1313,10 @@ async function enviarProdutoEsales(interaction, doc, banco) {
             await interaction.channel.send({ content: `**${dbe.get(`2`)} Como sua DM estava fechada, resolvi mandar o's produto's comprado's aqui mesmo.**\n- Lembre-se, o canal será fechado daqui a 2 minutos!`, files: [filed] })
         }
     })
+    } catch (error) {
+        console.error("[CarrinhoAprovado:enviarProdutoEsales] Erro ao entregar produto (eSales):", error)
+        await interaction.channel.send({ content: `${dbe.get("13")} | Ocorreu um erro ao processar a entrega do produto. Contate o suporte imediatamente, o pagamento já foi confirmado.` }).catch(() => {})
+    }
 }
 
 module.exports = {
