@@ -1,63 +1,75 @@
 const Discord = require("discord.js");
-const { EmbedBuilder, ModalBuilder, TextInputBuilder, ActionRowBuilder } = require("discord.js");
+const { ModalBuilder, TextInputBuilder, ActionRowBuilder } = require("discord.js");
 const { JsonDatabase } = require("wio.db");
 
-const dbe = new JsonDatabase({ databasePath: "./json/emojis.json" });
-const dbp = new JsonDatabase({ databasePath: "./json/perms.json" });
+const dbe = new JsonDatabase({
+    databasePath: "./json/emojis.json"
+});
+
+const dbp = new JsonDatabase({
+    databasePath: "./json/perms.json"
+});
+
 
 module.exports = {
-    name: `status`,
-    description: `🤖 | Mude os meus status.`,
+    name: "status",
+    description: "🤖 | Mude os meus status.",
     type: Discord.ApplicationCommandType.ChatInput,
 
     run: async (client, interaction) => {
-        // Defer para evitar timeout ao abrir o modal
-        await interaction.deferReply({ ephemeral: true }).catch(err => {
-            console.error(`[STATUS] Erro ao deferir:`, err);
-            return;
-        });
 
         try {
-            // Verificação de permissão
+
+            const emojiErro = dbe.get("13") || "❌";
+
+            // Permissão
             if (!dbp.has(interaction.user.id)) {
-                const emojiErro = dbe.get(`13`) || '❌';
-                return await interaction.editReply({
-                    content: `${emojiErro} | Você não tem permissão para usar este comando!`
+
+                return interaction.reply({
+                    content: `${emojiErro} | Você não tem permissão para usar este comando!`,
+                    flags: Discord.MessageFlags.Ephemeral
                 });
+
             }
 
-            // Criação do modal
+
             const modal = new ModalBuilder()
-                .setTitle("Alterar Status do seu BOT")
-                .setCustomId("modalconfigstatus");
+                .setCustomId("modalconfigstatus")
+                .setTitle("Alterar Status do BOT");
+
 
             const presenceInput = new TextInputBuilder()
                 .setCustomId("presence")
+                .setLabel("TIPO DE PRESENÇA")
+                .setPlaceholder("online, ausente, invisivel ou ocupado")
                 .setRequired(true)
-                .setPlaceholder("Online, Ausente, Invisivel ou Ocupado")
-                .setLabel("ESCOLHA O TIPO DE PRESENÇA:")
                 .setStyle(Discord.TextInputStyle.Short);
+
 
             const atividadeInput = new TextInputBuilder()
                 .setCustomId("atividade")
+                .setLabel("TIPO DE ATIVIDADE")
+                .setPlaceholder("jogando, assistindo, competindo, transmitindo, ouvindo")
                 .setRequired(true)
-                .setPlaceholder("Jogando, Assistindo, Competindo, Transmitindo, Ouvindo")
-                .setLabel("ESCOLHA O TIPO DE ATIVIDADE:")
                 .setStyle(Discord.TextInputStyle.Short);
+
 
             const textoInput = new TextInputBuilder()
                 .setCustomId("text_ativd")
+                .setLabel("TEXTO DA ATIVIDADE")
+                .setPlaceholder("Ex: Servidor de vendas")
                 .setRequired(true)
-                .setPlaceholder("Digite aqui")
-                .setLabel("ESCREVA O TEXTO DA ATIVIDADE:")
                 .setStyle(Discord.TextInputStyle.Short);
+
 
             const urlInput = new TextInputBuilder()
                 .setCustomId("url")
+                .setLabel("URL DA TRANSMISSÃO")
+                .setPlaceholder("Obrigatório somente em transmitir")
                 .setRequired(false)
-                .setLabel("URL DO CANAL:")
-                .setPlaceholder("Se a escolha foi Transmitindo, Coloque a Url aqui, ex: https://www.twitch.tv/discord")
-                .setStyle(Discord.TextInputStyle.Paragraph);
+                .setStyle(Discord.TextInputStyle.Short);
+
+
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(presenceInput),
@@ -66,96 +78,158 @@ module.exports = {
                 new ActionRowBuilder().addComponents(urlInput)
             );
 
-            // Mostra o modal
+
+            // IMPORTANTE: sem defer antes
             await interaction.showModal(modal);
 
-            // Aguarda a submissão do modal
+
+
             const submitted = await interaction.awaitModalSubmit({
-                time: 600_000, // 10 minutos
-                filter: (modalInteraction) => modalInteraction.user.id === interaction.user.id && modalInteraction.customId === "modalconfigstatus"
+
+                time: 600000,
+
+                filter: i =>
+                    i.user.id === interaction.user.id &&
+                    i.customId === "modalconfigstatus"
+
             }).catch(() => null);
 
-            if (!submitted) {
-                // Se o modal expirou ou foi cancelado, não há resposta pendente
-                return;
-            }
 
-            await submitted.deferReply({ ephemeral: true }).catch(() => {});
 
-            // Mapeamento de presenças e atividades
+            if (!submitted) return;
+
+
+
+            await submitted.reply({
+
+                content: "⏳ Alterando status...",
+                flags: Discord.MessageFlags.Ephemeral
+
+            });
+
+
+
             const presenceMap = {
+
                 "online": "online",
                 "ausente": "idle",
                 "invisivel": "invisible",
                 "ocupado": "dnd"
+
             };
+
 
             const activityMap = {
-                "jogando": "PLAYING",
-                "assistindo": "WATCHING",
-                "competindo": "COMPETING",
-                "transmitindo": "STREAMING",
-                "ouvindo": "LISTENING"
+
+                "jogando": Discord.ActivityType.Playing,
+                "assistindo": Discord.ActivityType.Watching,
+                "competindo": Discord.ActivityType.Competing,
+                "transmitindo": Discord.ActivityType.Streaming,
+                "ouvindo": Discord.ActivityType.Listening
+
             };
 
-            const presenceChoice = submitted.fields.getTextInputValue("presence").toLowerCase();
-            const activityChoice = submitted.fields.getTextInputValue("atividade").toLowerCase();
-            const activityText = submitted.fields.getTextInputValue("text_ativd");
-            const url = submitted.fields.getTextInputValue("url") || null;
 
-            // Validações
-            if (!presenceMap[presenceChoice]) {
-                return await submitted.editReply({
-                    content: `❌ | Tipo de presença inválido! Use: Online, Ausente, Invisivel ou Ocupado.`
+
+            const presence =
+                submitted.fields.getTextInputValue("presence")
+                .toLowerCase();
+
+
+            const activity =
+                submitted.fields.getTextInputValue("atividade")
+                .toLowerCase();
+
+
+            const text =
+                submitted.fields.getTextInputValue("text_ativd");
+
+
+            const url =
+                submitted.fields.getTextInputValue("url") || null;
+
+
+
+            if (!presenceMap[presence]) {
+
+                return submitted.editReply({
+                    content:
+                    "❌ Presença inválida. Use: online, ausente, invisivel ou ocupado."
                 });
+
             }
 
-            if (!activityMap[activityChoice]) {
-                return await submitted.editReply({
-                    content: `❌ | Tipo de atividade inválido! Use: Jogando, Assistindo, Competindo, Transmitindo, Ouvindo.`
+
+
+            if (!activityMap[activity]) {
+
+                return submitted.editReply({
+                    content:
+                    "❌ Atividade inválida. Use: jogando, assistindo, competindo, transmitindo ou ouvindo."
                 });
+
             }
 
-            if (activityChoice === "transmitindo" && !url) {
-                return await submitted.editReply({
-                    content: `❌ | Para "Transmitindo", você precisa fornecer uma URL (ex: https://www.twitch.tv/discord).`
+
+
+            if (activity === "transmitindo" && !url) {
+
+                return submitted.editReply({
+                    content:
+                    "❌ Informe a URL da Twitch para usar transmissão."
                 });
+
             }
 
-            // Atualiza o status do bot
-            const statusType = presenceMap[presenceChoice];
-            const activityType = activityMap[activityChoice];
 
-            client.user.setStatus(statusType);
 
-            const activityOptions = {
-                name: activityText,
-                type: Discord.ActivityType[activityType]
-            };
+            client.user.setPresence({
 
-            if (activityChoice === "transmitindo" && url) {
-                activityOptions.url = url;
-            }
+                status: presenceMap[presence],
 
-            client.user.setActivity(activityOptions);
+                activities: [
 
-            await submitted.editReply({
-                content: `✅ | Status alterado com sucesso!\n` +
-                    `**Presença:** ${presenceChoice}\n` +
-                    `**Atividade:** ${activityChoice} ${activityText}${url ? ` (${url})` : ''}`
+                    {
+                        name: text,
+                        type: activityMap[activity],
+                        url: activity === "transmitindo" ? url : undefined
+                    }
+
+                ]
+
             });
 
-        } catch (error) {
-            console.error(`[STATUS] Erro na execução:`, error);
-            try {
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({ content: `❌ | Ocorreu um erro ao alterar o status.` });
-                } else {
-                    await interaction.followUp({ content: `❌ | Erro inesperado.`, ephemeral: true });
-                }
-            } catch (replyErr) {
-                console.error(`[STATUS] Falha ao enviar mensagem de erro:`, replyErr);
+
+
+            await submitted.editReply({
+
+                content:
+                `✅ Status alterado com sucesso!\n\n` +
+                `🟢 Presença: ${presence}\n` +
+                `🎮 Atividade: ${activity}\n` +
+                `📝 Texto: ${text}`
+
+            });
+
+
+
+        } catch(error){
+
+            console.error("[STATUS] Erro:", error);
+
+
+            if(!interaction.replied && !interaction.deferred){
+
+                interaction.reply({
+
+                    content:"❌ Erro ao alterar status.",
+                    flags: Discord.MessageFlags.Ephemeral
+
+                }).catch(()=>{});
+
             }
+
         }
+
     }
 };
